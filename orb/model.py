@@ -89,7 +89,10 @@ class OrbModel:
             adapter, label = None, "Obscuro Base (Llama-3.2-1B)"
 
         tok_path = adapter or _PATHS["base"]
-        tokenizer = AutoTokenizer.from_pretrained(tok_path)
+        tokenizer = AutoTokenizer.from_pretrained(
+            tok_path,
+            clean_up_tokenization_spaces=False,  # BPE: don't strip spaces before punctuation
+        )
         if tokenizer.pad_token_id is None:
             tokenizer.pad_token_id = tokenizer.eos_token_id
 
@@ -168,6 +171,7 @@ class OrbModel:
 
         cfg = GenerationConfig(
             max_new_tokens=max_new_tokens,
+            max_length=None,             # suppress conflict with model's default max_length
             temperature=temperature,
             top_p=top_p,
             top_k=top_k,
@@ -215,4 +219,4 @@ class OrbModel:
             loss = self.model(**inputs, labels=labels).loss
 
         # Llama on coherent text: loss ~1.5–2.5. Map to [0,1]: lower = better.
-        return float(torch.sigmoid(torch.tensor(2.0 - loss)).item())
+        return float(torch.sigmoid(torch.tensor(2.0 - loss.item())))

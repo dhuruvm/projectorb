@@ -10,6 +10,8 @@ import os
 import traceback
 
 import gradio as gr
+import uvicorn
+from fastapi import FastAPI
 
 from orb.agent import OrbAgent, AgentOptions
 
@@ -346,12 +348,19 @@ with gr.Blocks(title="Obscuro — OASIS Cognitive Agent") as demo:
     ]:
         chip.click(fn=lambda t=text: t, outputs=msg, queue=False)
 
+# ── Build FastAPI host app, mount sandbox + Gradio into it ───────────────────
+# Gradio 6: create a FastAPI app first, register custom routes, then mount
+# the Gradio demo via gr.mount_gradio_app so everything runs on one port.
+
+fapp = FastAPI(title="Obscuro")
+
+from sandbox.server import register_sandbox
+register_sandbox(fapp, agent, model_badge)
+
+# Gradio serves at root; the sandbox is at /sandbox (already registered above)
+app = gr.mount_gradio_app(fapp, demo, path="/", app_kwargs={"root_path": ""})
+
 # ── Launch ────────────────────────────────────────────────────────────────────
 
 PORT = int(os.environ.get("PORT", 8000))
-demo.launch(
-    server_name="0.0.0.0",
-    server_port=PORT,
-    show_error=True,
-    css=CSS,
-)
+uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="warning")
