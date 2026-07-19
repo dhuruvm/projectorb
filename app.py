@@ -1,5 +1,6 @@
 """
-Orb — OASIS Cognitive Agent · Gradio 6 interface
+Obscuro — OASIS Cognitive Agent · Gradio 6 interface
+Created by The Director.
 
 Thin UI layer wrapping OrbAgent. All reasoning logic lives in orb/.
 """
@@ -197,16 +198,16 @@ body, .gradio-container { background: #080b14 !important; }
 
 model_badge = agent.model_label.split("(")[0].strip()
 
-with gr.Blocks(title="Orb — OASIS Cognitive Agent") as demo:
+with gr.Blocks(title="Obscuro — OASIS Cognitive Agent") as demo:
 
     gr.HTML(f"""
     <div id="page-header">
       <div class="logo">🔮</div>
       <div class="titles">
-        <h1>Orb · OASIS Cognitive Agent</h1>
-        <p>Multi-path Reasoning · Constitutional Critique · Persistent Memory · Curiosity Engine</p>
+        <h1>Obscuro · OASIS Cognitive Agent</h1>
+        <p>Created by The Director · Multi-path Reasoning · Constitutional Critique · Persistent Memory</p>
       </div>
-      <div class="badge">{model_badge} · 117M params</div>
+      <div class="badge">{model_badge} · 1.24B params</div>
     </div>
     """)
 
@@ -221,16 +222,16 @@ with gr.Blocks(title="Orb — OASIS Cognitive Agent") as demo:
                 placeholder=(
                     "<div style='text-align:center;color:#1e3a5f;padding:60px 0'>"
                     "<div style='font-size:3rem;margin-bottom:12px'>🔮</div>"
-                    "<div style='font-size:1.1rem;font-weight:600;color:#2d4a7a'>Orb is ready</div>"
+                    "<div style='font-size:1.1rem;font-weight:600;color:#2d4a7a'>Obscuro is ready</div>"
                     "<div style='font-size:0.85rem;margin-top:6px;color:#1e3a5f'>"
-                    "Cognitive loop active — multi-path reasoning, memory, self-critique</div>"
+                    "Created by The Director · Cognitive loop active</div>"
                     "</div>"
                 ),
             )
 
             with gr.Row(variant="panel"):
                 msg = gr.Textbox(
-                    placeholder="Ask Orb anything…",
+                    placeholder="Ask Obscuro anything…",
                     show_label=False, lines=2, max_lines=6,
                     elem_id="msg-box", scale=5, container=False,
                 )
@@ -286,7 +287,8 @@ with gr.Blocks(title="Orb — OASIS Cognitive Agent") as demo:
             <div style="margin-top:16px;border-top:1px solid #1a2844;padding-top:14px">
               <div class="sh">Model info</div>
               <div style="display:flex;flex-wrap:wrap;gap:5px">
-                <span class="pill purple">model <span>Orb</span></span>
+                <span class="pill purple">model <span>Obscuro</span></span>
+                <span class="pill">by <span>The Director</span></span>
                 <span class="pill">params <span>117 M</span></span>
                 <span class="pill">ctx <span>1024 tok</span></span>
                 <span class="pill green">checkpoint <span>{model_badge}</span></span>
@@ -297,9 +299,9 @@ with gr.Blocks(title="Orb — OASIS Cognitive Agent") as demo:
     gr.HTML("""
     <div style="border-top:1px solid #1a2844;padding:10px 0 2px;
                 display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <span class="pill purple">Obscuro <span>by The Director</span></span>
       <span class="pill">framework <span>OASIS · HuggingFace</span></span>
-      <span class="pill purple">architecture <span>multi-path + critique + memory</span></span>
-      <span class="pill">weights <span>local · models/</span></span>
+      <span class="pill">architecture <span>multi-path + critique + memory</span></span>
     </div>
     """)
 

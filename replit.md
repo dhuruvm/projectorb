@@ -1,6 +1,7 @@
-# Orb — OASIS Cognitive Agent
+# Obscuro — OASIS Cognitive Agent
+*Created by The Director*
 
-An autonomous AI agent built on GPT-2 (117M params) using the **OASIS** framework. The architecture implements a real cognitive loop — multi-path reasoning, persistent memory, constitutional self-critique, and a curiosity engine — as a clean Python package.
+An autonomous AI agent built on Llama-3.2-1B (1.24B params) using the **OASIS** framework. The architecture implements a real cognitive loop — multi-path reasoning, persistent memory, constitutional self-critique, and a curiosity engine — as a clean Python package.
 
 ## How to run
 

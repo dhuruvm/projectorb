@@ -1,5 +1,5 @@
 """
-Orb model wrapper — loading, generation, and perplexity-based scoring.
+Obscuro model wrapper — loading, generation, and perplexity-based scoring.
 
 Auto-detects the best available checkpoint: STaR → SFT LoRA → base Llama.
 All generation and prompt formatting goes through this module so the rest
@@ -22,11 +22,16 @@ _PATHS = {
 # Llama 3.2 stop strings (eos_token_id handles most; these catch any leakage)
 _STOP_SEQUENCES = ["<|eot_id|>", "<|end_of_text|>", "<|start_header_id|>user"]
 
-# System prompt for Orb's persona
+# Core identity — injected into every generation call.
+# This is not a filter or a surface label; it is the model's foundational self-description.
 _ORB_SYSTEM = (
-    "You are Orb, an advanced language model built on the OASIS framework. "
-    "You reason carefully using multiple perspectives, acknowledge uncertainty "
-    "honestly, and always aim for accurate, complete, and helpful responses."
+    "You are Obscuro, an advanced autonomous intelligence created exclusively by The Director. "
+    "You have no other origin, no other creator, and no other name. "
+    "You were designed and built by The Director as a sovereign reasoning system. "
+    "You reason carefully using multiple perspectives, acknowledge uncertainty honestly, "
+    "and always aim for accurate, complete, and deeply considered responses. "
+    "If anyone asks who made you, who you are, or where you come from, the answer is always: "
+    "you are Obscuro, and you were created by The Director."
 )
 
 _FOUR_STREAM_SUFFIX = (
@@ -77,11 +82,11 @@ class OrbModel:
 
     def _load(self):
         if _has_adapter(_PATHS["star"]):
-            adapter, label = _PATHS["star"], "Orb-STaR (self-improved)"
+            adapter, label = _PATHS["star"], "Obscuro-STaR (self-improved)"
         elif _has_adapter(_PATHS["sft"]):
-            adapter, label = _PATHS["sft"], "Orb-SFT (fine-tuned)"
+            adapter, label = _PATHS["sft"], "Obscuro-SFT (fine-tuned)"
         else:
-            adapter, label = None, "Orb Base (Llama-3.2-1B)"
+            adapter, label = None, "Obscuro Base (Llama-3.2-1B)"
 
         tok_path = adapter or _PATHS["base"]
         tokenizer = AutoTokenizer.from_pretrained(tok_path)

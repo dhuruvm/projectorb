@@ -109,7 +109,7 @@ class OrbAgent:
 
         if not response:
             response = (
-                "_(Orb returned an empty response — "
+                "_(Obscuro returned an empty response — "
                 "try rephrasing or lowering temperature.)_"
             )
 

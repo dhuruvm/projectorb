@@ -1,6 +1,6 @@
 """
-Orb — OASIS Cognitive Agent
-Orthogonal Autonomous Self-Improving System
+Obscuro — OASIS Cognitive Agent
+Created by The Director · Orthogonal Autonomous Self-Improving System
 
 Package layout:
   model     — GPT-2 wrapper: loading, generation, scoring
