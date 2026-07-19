@@ -2,18 +2,7 @@
 Orb Executive Controller — the cognitive loop.
 
 Each call to run() executes the full loop:
-
   Observe → Remember → Reason → Critique → Learn → Respond
-
-Components:
-  OrbModel         — generation and scoring
-  Memory           — SQLite-backed episodic + semantic persistence
-  MultiPathReasoner — 3-candidate generation with ranking
-  Critic           — constitutional self-critique and revision
-  CuriosityEngine  — ambiguity detection and gap identification
-
-The agent is intentionally stateless between calls (all state lives in
-Memory) so it can be shared safely across Gradio's threaded request model.
 """
 from __future__ import annotations
 
@@ -22,23 +11,23 @@ from dataclasses import dataclass, field
 
 from .model import OrbModel
 from .memory import Memory
-from .reasoning import MultiPathReasoner, RankedResponse, build_prompt
+from .reasoning import MultiPathReasoner, RankedResponse
 from .critic import Critic, CritiqueResult
 from .curiosity import CuriosityEngine
 
 
 @dataclass
 class AgentOptions:
-    max_new_tokens: int   = 200
-    temperature:    float = 0.85
-    top_p:          float = 0.95
-    top_k:          int   = 50
+    max_new_tokens:     int   = 200
+    temperature:        float = 0.85
+    top_p:              float = 0.95
+    top_k:              int   = 50
     repetition_penalty: float = 1.1
-    seed:           int   = 42
-    four_stream:    bool  = False
-    use_critique:   bool  = False
-    use_memory:     bool  = True
-    multi_path:     bool  = True
+    seed:               int   = 42
+    four_stream:        bool  = False
+    use_critique:       bool  = False
+    use_memory:         bool  = True
+    multi_path:         bool  = True
 
 
 @dataclass
@@ -57,14 +46,13 @@ class OrbAgent:
     Usage:
         agent = OrbAgent()                       # load once at startup
         result = agent.run(message, history)     # call per user turn
-        print(result.response)
     """
 
     def __init__(self) -> None:
-        self.model    = OrbModel()
-        self.memory   = Memory()
-        self.reasoner = MultiPathReasoner(self.model)
-        self.critic   = Critic(self.model)
+        self.model     = OrbModel()
+        self.memory    = Memory()
+        self.reasoner  = MultiPathReasoner(self.model)
+        self.critic    = Critic(self.model)
         self.curiosity = CuriosityEngine(self.model)
 
     # ── Public API ────────────────────────────────────────────────────────────
@@ -75,17 +63,6 @@ class OrbAgent:
         history: list[dict],
         options: AgentOptions | None = None,
     ) -> AgentResponse:
-        """
-        Execute the full cognitive loop for one user turn.
-
-        Steps:
-          1. Observe     — validate and normalise the input
-          2. Remember    — retrieve relevant past episodes from memory
-          3. Reason      — multi-path or single-path generation
-          4. Critique    — constitutional self-critique + revision (optional)
-          5. Learn       — persist episode to memory
-          6. Respond     — return structured result
-        """
         if options is None:
             options = AgentOptions()
 
@@ -116,7 +93,9 @@ class OrbAgent:
             )
             result.reasoning_paths = paths
         else:
-            prompt = build_prompt(message, history, four_stream=options.four_stream)
+            prompt = self.model.build_prompt(
+                message, history, four_stream=options.four_stream
+            )
             response = self.model.generate(
                 prompt,
                 max_new_tokens=options.max_new_tokens,

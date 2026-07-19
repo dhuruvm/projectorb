@@ -4,10 +4,6 @@ Orb multi-path reasoning engine.
 Generates N candidate responses at distinct temperatures, scores each with
 a combination of model perplexity and fast heuristics, then returns the
 best candidate along with the full ranked list for inspection.
-
-Three temperatures (conservative / balanced / creative) explore different
-regions of the probability distribution so the agent isn't committed to
-a single sampling strategy.
 """
 from __future__ import annotations
 
@@ -18,52 +14,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .model import OrbModel
 
-# ── Prompt templates ──────────────────────────────────────────────────────────
-
-_ORB_SYSTEM = (
-    "You are Orb, an advanced language model built on the OASIS framework. "
-    "You reason carefully using multiple perspectives, acknowledge uncertainty "
-    "honestly, and always aim for accurate, complete, and helpful responses."
-)
-
-_FOUR_STREAM_SUFFIX = (
-    "\n\nReason through this carefully using four analytical streams:\n"
-    "[ANALYTICAL] Break the problem into logical components.\n"
-    "[SKEPTICAL]  Challenge assumptions — what might be wrong or missing?\n"
-    "[CONCRETE]   Ground with specific examples, numbers, or evidence.\n"
-    "[SYNTHESIS]  Combine insights into a clear, complete answer.\n\n"
-)
-
-
-def build_prompt(message: str, history: list[dict], *, four_stream: bool = False) -> str:
-    lines = [f"<|system|>\n{_ORB_SYSTEM}"]
-    for entry in history:
-        if not isinstance(entry, dict):
-            continue
-        role    = entry.get("role", "")
-        content = _get_text(entry.get("content", ""))
-        if role == "user":
-            lines.append(f"<|user|>\n{content}")
-        elif role == "assistant":
-            lines.append(f"<|orb|>\n{content}<|end|>")
-    suffix = _FOUR_STREAM_SUFFIX if four_stream else "\n"
-    lines.append(f"<|user|>\n{message}{suffix}<|orb|>")
-    return "\n".join(lines)
-
-
-def _get_text(content) -> str:
-    if isinstance(content, str):
-        return content
-    if isinstance(content, (list, tuple)):
-        parts = []
-        for item in content:
-            if isinstance(item, str):
-                parts.append(item)
-            elif isinstance(item, dict):
-                parts.append(item.get("text") or item.get("content") or "")
-        return " ".join(p for p in parts if p).strip()
-    return str(content)
-
 
 # ── Heuristic scoring ─────────────────────────────────────────────────────────
 
@@ -72,9 +22,9 @@ def _heuristic_score(question: str, response: str) -> float:
     Fast quality estimate without a model call.
 
     Three components (weighted):
-      length_score   — reward responses in the 80–400 char sweet spot
-      uniqueness     — penalise 4-gram repetition (sign of degenerate output)
-      relevance      — fraction of question keywords present in response
+      length_score — reward responses in the 80–400 char sweet spot
+      uniqueness   — penalise 4-gram repetition
+      relevance    — fraction of question keywords present in response
     """
     if not response:
         return 0.0
@@ -116,7 +66,6 @@ class RankedResponse:
 
     @property
     def combined_score(self) -> float:
-        """60 % heuristic (fast) + 40 % model perplexity (slower but principled)."""
         return 0.6 * self.heuristic_score + 0.4 * self.model_score
 
     def __repr__(self) -> str:
@@ -136,8 +85,8 @@ class MultiPathReasoner:
 
     Temperature spread:
       0.60 — conservative, low variance, safer phrasing
-      0.85 — balanced (default single-path temperature)
-      1.10 — creative, higher variance, occasionally surprising
+      0.85 — balanced
+      1.10 — creative, higher variance
     """
 
     TEMPERATURES = [0.60, 0.85, 1.10]
@@ -161,7 +110,7 @@ class MultiPathReasoner:
         Returns (best_response_text, all_ranked_candidates).
         Candidates are sorted best-first by combined_score.
         """
-        prompt = build_prompt(message, history, four_stream=four_stream)
+        prompt = self._model.build_prompt(message, history, four_stream=four_stream)
         candidates: list[RankedResponse] = []
 
         for i, temp in enumerate(self.TEMPERATURES):
