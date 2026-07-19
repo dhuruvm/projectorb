@@ -1,0 +1,3 @@
+- [Orb Model Project](orb-project.md) — GPT-2 renamed to Orb; OASIS training framework designed; full research docs in Docs/orb-research/
+- [OASIS Training Pipeline](oasis-pipeline.md) — Novel training method: SFT→Orthogonal Reasoning→Constitutional DPO→SPIN→STaR; designed for small models, no GPU needed
+- [Orb Dependencies](orb-deps.md) — PyTorch+transformers+peft installed via `uv pip install`; model weights auto-downloaded from HF; gguf+sentencepiece needed for GGUF conversion

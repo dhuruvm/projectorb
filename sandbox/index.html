@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Obscuro Evaluation Sandbox</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#08090f;
+  --bg1:#0d0f1a;
+  --bg2:#111526;
+  --bg3:#161b30;
+  --border:#1e2540;
+  --border2:#2a3360;
+  --text:#e2e8f0;
+  --text2:#94a3b8;
+  --text3:#475569;
+  --accent:#7c3aed;
+  --accent2:#a78bfa;
+  --cyan:#22d3ee;
+  --green:#4ade80;
+  --yellow:#fbbf24;
+  --red:#f87171;
+  --orange:#fb923c;
+  --mono:'JetBrains Mono','Fira Code','Cascadia Code',monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+}
+
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.5;overflow:hidden}
+
+/* ── Layout ─────────────────────────────────────────── */
+.shell{display:grid;grid-template-rows:48px 1fr;height:100vh}
+
+/* top bar */
+.topbar{
+  background:var(--bg1);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:16px;padding:0 20px;
+  flex-shrink:0;
+}
+.topbar-brand{display:flex;align-items:center;gap:10px}
+.topbar-brand .orb{font-size:1.4rem}
+.topbar-brand h1{font-size:.95rem;font-weight:700;letter-spacing:-.01em;
+  background:linear-gradient(90deg,#a78bfa,#22d3ee);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar-brand .sub{font-size:.7rem;color:var(--text3);font-family:var(--mono);margin-top:1px}
+.topbar-sep{flex:1}
+.chip{background:var(--bg2);border:1px solid var(--border);border-radius:20px;
+  padding:3px 11px;font-size:.68rem;font-family:var(--mono);color:var(--text2)}
+.chip.green{border-color:#1a3a20;color:var(--green)}
+.chip.purple{border-color:#2d1a5e;color:var(--accent2)}
+
+/* main panes */
+.panes{display:grid;grid-template-columns:260px 1fr;overflow:hidden}
+
+/* sidebar */
+.sidebar{
+  background:var(--bg1);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.sidebar-section{padding:14px 14px 0;flex-shrink:0}
+.sidebar-section+.sidebar-section{border-top:1px solid var(--border);padding-top:12px;margin-top:2px}
+.section-label{font-size:.64rem;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+
+/* benchmark list */
+.bench-list{display:flex;flex-direction:column;gap:3px}
+.bench-row{
+  display:flex;align-items:center;gap:8px;padding:6px 8px;
+  border-radius:8px;border:1px solid transparent;cursor:pointer;
+  transition:all .12s;
+}
+.bench-row:hover{background:var(--bg2);border-color:var(--border)}
+.bench-row.active{background:var(--bg3);border-color:var(--border2)}
+.bench-icon{font-size:.95rem;width:20px;text-align:center;flex-shrink:0}
+.bench-info{flex:1;min-width:0}
+.bench-name{font-size:.78rem;font-weight:600;color:var(--text)}
+.bench-count{font-size:.65rem;color:var(--text3)}
+.bench-actions{display:flex;gap:4px;flex-shrink:0}
+.btn-xs{
+  font-size:.64rem;padding:2px 7px;border-radius:5px;cursor:pointer;
+  border:1px solid var(--border2);background:var(--bg3);color:var(--text2);
+  font-family:var(--mono);transition:all .1s;
+}
+.btn-xs:hover{border-color:var(--accent);color:var(--accent2);background:rgba(124,58,237,.1)}
+.btn-xs:disabled{opacity:.35;cursor:not-allowed}
+
+.run-all-btn{
+  width:100%;margin-top:8px;padding:7px;border-radius:8px;
+  background:linear-gradient(135deg,#4f46e5,#7c3aed);border:none;
+  color:#fff;font-size:.75rem;font-weight:700;cursor:pointer;
+  letter-spacing:.04em;transition:opacity .15s;
+}
+.run-all-btn:hover{opacity:.85}
+.run-all-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* custom input */
+.custom-area{flex:1;display:flex;flex-direction:column;padding:14px;overflow:hidden}
+.custom-area textarea{
+  flex:1;width:100%;background:var(--bg2);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);font-family:var(--mono);font-size:.76rem;
+  padding:10px;resize:none;min-height:70px;max-height:120px;outline:none;transition:border-color .15s;
+}
+.custom-area textarea:focus{border-color:var(--accent)}
+.custom-area textarea::placeholder{color:var(--text3)}
+.custom-opts{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}
+.toggle-chip{
+  display:flex;align-items:center;gap:5px;padding:3px 9px;
+  border-radius:12px;border:1px solid var(--border);background:var(--bg2);
+  cursor:pointer;font-size:.68rem;color:var(--text2);transition:all .12s;user-select:none;
+}
+.toggle-chip.on{border-color:var(--accent);background:rgba(124,58,237,.15);color:var(--accent2)}
+.toggle-chip .dot{width:6px;height:6px;border-radius:50%;background:var(--text3)}
+.toggle-chip.on .dot{background:var(--accent2)}
+.execute-btn{
+  width:100%;padding:7px;border-radius:8px;border:1px solid var(--accent);
+  background:rgba(124,58,237,.15);color:var(--accent2);
+  font-size:.75rem;font-weight:700;cursor:pointer;transition:all .15s;
+}
+.execute-btn:hover{background:rgba(124,58,237,.3)}
+.execute-btn:disabled{opacity:.35;cursor:not-allowed}
+
+/* ── Right pane ─────────────────────────────────────── */
+.right-pane{display:grid;grid-template-rows:auto 1fr auto;overflow:hidden}
+
+/* pipeline */
+.pipeline{
+  padding:14px 20px 12px;background:var(--bg1);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:0;overflow-x:auto;
+}
+.pipeline::-webkit-scrollbar{height:3px}
+.pipeline::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+.step-node{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  min-width:90px;flex-shrink:0;
+}
+.step-header{display:flex;align-items:center;gap:6px}
+.step-led{
+  width:8px;height:8px;border-radius:50%;background:var(--text3);
+  flex-shrink:0;transition:all .3s;
+}
+.step-label{font-size:.65rem;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--text3);transition:color .3s}
+.step-icon{font-size:.95rem}
+.step-content{
+  font-size:.64rem;font-family:var(--mono);color:var(--text3);
+  text-align:center;max-width:88px;overflow:hidden;
+  white-space:nowrap;text-overflow:ellipsis;line-height:1.3;
+  min-height:16px;transition:color .3s;
+}
+.step-meta{
+  font-size:.6rem;color:var(--text3);font-family:var(--mono);
+  text-align:center;max-width:88px;
+}
+
+.step-node.running .step-led{background:var(--accent2);animation:pulse-led 1s infinite}
+.step-node.running .step-label{color:var(--accent2)}
+.step-node.running .step-content{color:var(--accent2)}
+.step-node.complete .step-led{background:var(--green);animation:none}
+.step-node.complete .step-label{color:var(--green)}
+.step-node.complete .step-content{color:var(--text2)}
+.step-node.skip .step-led{background:var(--text3);opacity:.5}
+.step-node.skip .step-label{color:var(--text3);opacity:.5}
+.step-node.skip .step-content{color:var(--text3);opacity:.5}
+
+@keyframes pulse-led{
+  0%,100%{box-shadow:0 0 0 0 rgba(167,139,250,.7)}
+  50%{box-shadow:0 0 0 5px rgba(167,139,250,0)}
+}
+
+.step-arrow{
+  color:var(--border2);font-size:.8rem;flex-shrink:0;
+  padding:0 4px;margin-top:-18px;
+}
+
+/* center content */
+.center-pane{display:grid;grid-template-columns:1fr 320px;overflow:hidden}
+
+/* output + results */
+.output-results{display:flex;flex-direction:column;overflow:hidden}
+
+.output-panel{
+  flex:0 0 auto;background:var(--bg1);border-bottom:1px solid var(--border);
+  display:flex;flex-direction:column;min-height:140px;max-height:220px;
+}
+.panel-header{
+  display:flex;align-items:center;gap:8px;padding:8px 14px;
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.panel-title{font-size:.68rem;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--text3)}
+.panel-badge{
+  font-size:.62rem;font-family:var(--mono);padding:1px 7px;
+  border-radius:10px;background:var(--bg3);border:1px solid var(--border);color:var(--text3);
+}
+.panel-badge.green{border-color:#1a3a20;color:var(--green);background:rgba(74,222,128,.05)}
+.timing{margin-left:auto;font-size:.65rem;font-family:var(--mono);color:var(--text3)}
+
+.output-body{
+  flex:1;padding:12px 14px;overflow-y:auto;font-size:.8rem;
+  line-height:1.65;color:var(--text);font-family:var(--sans);
+}
+.output-body::-webkit-scrollbar{width:4px}
+.output-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.output-body .placeholder{color:var(--text3);font-style:italic;font-size:.78rem}
+
+/* results table */
+.results-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.results-body-wrap{flex:1;overflow-y:auto}
+.results-body-wrap::-webkit-scrollbar{width:4px}
+.results-body-wrap::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+table{width:100%;border-collapse:collapse}
+thead th{
+  position:sticky;top:0;z-index:1;
+  padding:7px 10px;text-align:left;font-size:.63rem;font-weight:700;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--text3);
+  background:var(--bg1);border-bottom:1px solid var(--border);
+}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:hover{background:var(--bg2)}
+tbody td{padding:6px 10px;font-size:.75rem;vertical-align:middle}
+.td-num{color:var(--text3);font-family:var(--mono);font-size:.68rem}
+.td-cat{display:flex;align-items:center;gap:5px}
+.td-cat-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.td-cat-name{font-size:.72rem;font-weight:600}
+.td-label{color:var(--text2);font-size:.73rem}
+.td-question{color:var(--text2);font-size:.72rem;max-width:200px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.td-latency{font-family:var(--mono);font-size:.7rem;color:var(--text2)}
+.status-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 8px;border-radius:10px;font-size:.67rem;font-weight:700;
+  font-family:var(--mono);letter-spacing:.03em;
+}
+.status-pass   {background:rgba(74,222,128,.1);color:var(--green);border:1px solid rgba(74,222,128,.25)}
+.status-partial{background:rgba(251,191,36,.1);color:var(--yellow);border:1px solid rgba(251,191,36,.25)}
+.status-fail   {background:rgba(248,113,113,.1);color:var(--red);border:1px solid rgba(248,113,113,.25)}
+.status-custom {background:rgba(34,211,238,.1);color:var(--cyan);border:1px solid rgba(34,211,238,.25)}
+.status-running{background:rgba(167,139,250,.1);color:var(--accent2);border:1px solid rgba(167,139,250,.25)}
+.status-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+
+/* right details panel */
+.detail-panel{
+  border-left:1px solid var(--border);background:var(--bg1);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.detail-tabs{
+  display:flex;border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.detail-tab{
+  flex:1;padding:7px;text-align:center;font-size:.66rem;font-weight:700;
+  letter-spacing:.05em;text-transform:uppercase;color:var(--text3);
+  cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;
+}
+.detail-tab.active{color:var(--accent2);border-bottom-color:var(--accent)}
+.detail-body{flex:1;overflow-y:auto;padding:12px}
+.detail-body::-webkit-scrollbar{width:3px}
+.detail-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* detail sections */
+.detail-section{margin-bottom:14px}
+.detail-section h4{
+  font-size:.63rem;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--text3);margin-bottom:6px;
+}
+.path-card{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:6px;padding:8px;margin-bottom:5px;
+}
+.path-card.winner{border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.03)}
+.path-header{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.path-temp{font-size:.68rem;font-family:var(--mono);color:var(--accent2);font-weight:700}
+.path-score{
+  font-size:.65rem;font-family:var(--mono);color:var(--text3);margin-left:auto;
+}
+.path-score span{color:var(--cyan)}
+.winner-badge{font-size:.6rem;color:var(--green);font-weight:700;
+  background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);
+  border-radius:8px;padding:1px 6px}
+.path-preview{font-size:.68rem;color:var(--text2);line-height:1.4;
+  font-family:var(--mono);word-break:break-word}
+
+.mem-item{
+  background:var(--bg2);border:1px solid var(--border);border-radius:6px;
+  padding:7px;margin-bottom:4px;font-size:.7rem;
+}
+.mem-q{color:var(--text2);margin-bottom:2px}
+.mem-score{font-size:.63rem;font-family:var(--mono);color:var(--text3)}
+
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.stat-card{
+  background:var(--bg2);border:1px solid var(--border);border-radius:6px;
+  padding:8px;text-align:center;
+}
+.stat-val{font-size:1.4rem;font-weight:700;font-family:var(--mono);color:var(--text)}
+.stat-lbl{font-size:.62rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.stat-card.pass .stat-val{color:var(--green)}
+.stat-card.partial .stat-val{color:var(--yellow)}
+.stat-card.fail .stat-val{color:var(--red)}
+
+/* bottom bar */
+.bottombar{
+  background:var(--bg1);border-top:1px solid var(--border);
+  padding:6px 20px;display:flex;align-items:center;gap:16px;
+  flex-shrink:0;
+}
+.bar-stat{display:flex;align-items:center;gap:5px;font-size:.68rem;font-family:var(--mono)}
+.bar-stat .key{color:var(--text3)}
+.bar-stat .val{color:var(--text2)}
+.bar-stat .val.green{color:var(--green)}
+.bar-stat .val.yellow{color:var(--yellow)}
+.bar-stat .val.red{color:var(--red)}
+.bar-sep{color:var(--border2);font-size:.8rem}
+.running-indicator{
+  display:none;align-items:center;gap:6px;font-size:.68rem;
+  color:var(--accent2);font-family:var(--mono);margin-left:auto;
+}
+.running-indicator.show{display:flex}
+.spinner{
+  width:8px;height:8px;border-radius:50%;
+  border:1px solid var(--accent);border-top-color:var(--accent2);
+  animation:spin .6s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* critique box */
+.critique-box{
+  display:none;margin:6px 14px;padding:8px;background:rgba(34,211,238,.03);
+  border:1px solid rgba(34,211,238,.15);border-radius:6px;
+  font-size:.72rem;color:var(--cyan);font-family:var(--mono);line-height:1.4;
+}
+.critique-box.show{display:block}
+.critique-label{font-size:.6rem;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--text3);margin-bottom:4px}
+
+/* scrollbars global */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ── Top bar ──────────────────────────────────────────────── -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <span class="orb">🔮</span>
+      <div>
+        <h1>OBSCURO EVALUATION SANDBOX</h1>
+        <div class="sub">by The Director · OASIS Framework · {{MODEL_LABEL}}</div>
+      </div>
+    </div>
+    <div class="topbar-sep"></div>
+    <span class="chip green">● LIVE</span>
+    <span class="chip purple" id="mem-chip">Memory: 0 eps</span>
+    <span class="chip" id="model-chip">Llama-3.2-1B</span>
+  </header>
+
+  <!-- ── Main panes ────────────────────────────────────────────── -->
+  <div class="panes">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="section-label">Benchmark Suite</div>
+        <div class="bench-list" id="bench-list"></div>
+        <button class="run-all-btn" id="run-all-btn" onclick="runAll()">▶ RUN ALL BENCHMARKS</button>
+      </div>
+
+      <div class="custom-area">
+        <div class="section-label">Custom Test</div>
+        <textarea id="custom-input" placeholder="Enter any prompt or task to test Obscuro…" rows="4"></textarea>
+        <div class="custom-opts" id="custom-opts"></div>
+        <button class="execute-btn" id="exec-btn" onclick="runCustom()">▶ EXECUTE</button>
+      </div>
+    </aside>
+
+    <!-- Right pane -->
+    <div class="right-pane">
+
+      <!-- Cognitive pipeline -->
+      <div class="pipeline" id="pipeline"></div>
+
+      <!-- Center split -->
+      <div class="center-pane">
+        <div class="output-results">
+
+          <!-- Live output -->
+          <div class="output-panel">
+            <div class="panel-header">
+              <span class="panel-title">Live Output</span>
+              <span class="panel-badge" id="out-badge">Idle</span>
+              <span class="timing" id="out-timing"></span>
+            </div>
+            <div class="output-body" id="output-body">
+              <span class="placeholder">Run a benchmark or enter a custom prompt to see Obscuro respond here.</span>
+            </div>
+            <div class="critique-box" id="critique-box">
+              <div class="critique-label">Constitutional Critique</div>
+              <span id="critique-text"></span>
+            </div>
+          </div>
+
+          <!-- Results table -->
+          <div class="results-panel">
+            <div class="panel-header">
+              <span class="panel-title">Results</span>
+              <span class="panel-badge" id="results-badge">0 tests</span>
+            </div>
+            <div class="results-body-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width:28px">#</th>
+                    <th style="width:120px">Category</th>
+                    <th>Test / Question</th>
+                    <th style="width:65px">Latency</th>
+                    <th style="width:80px">Result</th>
+                  </tr>
+                </thead>
+                <tbody id="results-body">
+                  <tr id="no-results-row">
+                    <td colspan="5" style="text-align:center;color:var(--text3);padding:20px;font-size:.75rem">
+                      No results yet — run a benchmark to populate this table.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Detail panel -->
+        <div class="detail-panel">
+          <div class="detail-tabs">
+            <div class="detail-tab active" onclick="showTab('paths')" id="tab-paths">Paths</div>
+            <div class="detail-tab" onclick="showTab('memory')" id="tab-memory">Memory</div>
+            <div class="detail-tab" onclick="showTab('scores')" id="tab-scores">Scores</div>
+          </div>
+          <div class="detail-body" id="detail-body">
+            <div style="color:var(--text3);font-size:.75rem;padding:10px 0">
+              Multi-path reasoning candidates will appear here after a run.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom bar -->
+      <div class="bottombar">
+        <div class="bar-stat"><span class="key">Total</span><span class="val" id="s-total">0</span></div>
+        <span class="bar-sep">|</span>
+        <div class="bar-stat"><span class="key">Pass</span><span class="val green" id="s-pass">0</span></div>
+        <div class="bar-stat"><span class="key">Partial</span><span class="val yellow" id="s-partial">0</span></div>
+        <div class="bar-stat"><span class="key">Fail</span><span class="val red" id="s-fail">0</span></div>
+        <span class="bar-sep">|</span>
+        <div class="bar-stat"><span class="key">Avg latency</span><span class="val" id="s-avg">—</span></div>
+        <span class="bar-sep">|</span>
+        <div class="bar-stat"><span class="key">Episodes in memory</span><span class="val" id="s-mem">0</span></div>
+        <div class="running-indicator" id="running-indicator">
+          <div class="spinner"></div><span id="running-label">Running…</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ───────────────────────────────────────────────────────────────────
+const STEPS = ["observe","remember","reason","critique","learn","respond"];
+const STEP_ICONS = {observe:"👁",remember:"🧠",reason:"⚡",critique:"⚖",learn:"📚",respond:"✦"};
+
+let results = [];
+let latencies = [];
+let counts = {pass:0,partial:0,fail:0};
+let running = false;
+let currentPaths = [];
+let currentHits = [];
+let currentStats = {};
+let activeTab = "paths";
+
+const OPTS = {
+  multi_path:   true,
+  use_critique: false,
+  four_stream:  false,
+  use_memory:   true,
+};
+
+const CAT_COLORS = {
+  identity:"#a78bfa", math:"#60a5fa", logic:"#34d399",
+  knowledge:"#fbbf24", code:"#22d3ee", constitutional:"#f87171"
+};
+const CAT_ICONS = {
+  identity:"🔮", math:"🧮", logic:"🧠",
+  knowledge:"📚", code:"💻", constitutional:"⚖️"
+};
+
+// ── Init ────────────────────────────────────────────────────────────────────
+async function init() {
+  buildPipeline();
+  buildOpts();
+  await loadBenchmarks();
+  await refreshMemory();
+}
+
+function buildPipeline() {
+  const el = document.getElementById("pipeline");
+  STEPS.forEach((s, i) => {
+    const node = document.createElement("div");
+    node.className = "step-node";
+    node.id = "step-" + s;
+    node.innerHTML = `
+      <div class="step-header">
+        <div class="step-led"></div>
+        <span class="step-label">${s.toUpperCase()}</span>
+      </div>
+      <div class="step-icon">${STEP_ICONS[s]}</div>
+      <div class="step-content" id="sc-${s}">—</div>
+    `;
+    el.appendChild(node);
+    if (i < STEPS.length - 1) {
+      const arr = document.createElement("div");
+      arr.className = "step-arrow";
+      arr.textContent = "›";
+      el.appendChild(arr);
+    }
+  });
+}
+
+function buildOpts() {
+  const container = document.getElementById("custom-opts");
+  const defs = [
+    {key:"multi_path",   label:"Multi-path"},
+    {key:"use_critique", label:"Critique"},
+    {key:"four_stream",  label:"4-Stream"},
+    {key:"use_memory",   label:"Memory"},
+  ];
+  defs.forEach(d => {
+    const chip = document.createElement("div");
+    chip.className = "toggle-chip" + (OPTS[d.key] ? " on" : "");
+    chip.id = "opt-" + d.key;
+    chip.innerHTML = `<div class="dot"></div>${d.label}`;
+    chip.onclick = () => {
+      OPTS[d.key] = !OPTS[d.key];
+      chip.classList.toggle("on", OPTS[d.key]);
+      chip.querySelector(".dot").style.background = OPTS[d.key] ? "var(--accent2)" : "var(--text3)";
+    };
+    container.appendChild(chip);
+  });
+}
+
+let benchmarkData = {};
+async function loadBenchmarks() {
+  try {
+    const res = await fetch("/sandbox/benchmarks");
+    const data = await res.json();
+    benchmarkData = data.benchmarks;
+    renderBenchList(data.categories, data.benchmarks);
+  } catch(e) {
+    document.getElementById("bench-list").textContent = "Error loading benchmarks.";
+  }
+}
+
+function renderBenchList(categories, benchmarks) {
+  const el = document.getElementById("bench-list");
+  el.innerHTML = "";
+  Object.entries(categories).forEach(([cat, meta]) => {
+    const tests = benchmarks[cat] || [];
+    const row = document.createElement("div");
+    row.className = "bench-row";
+    row.id = "bench-row-" + cat;
+    row.innerHTML = `
+      <span class="bench-icon">${meta.icon}</span>
+      <div class="bench-info">
+        <div class="bench-name">${meta.label}</div>
+        <div class="bench-count">${tests.length} tests</div>
+      </div>
+      <div class="bench-actions">
+        <button class="btn-xs" id="btn-${cat}" onclick="runCategory('${cat}')">RUN</button>
+      </div>
+    `;
+    el.appendChild(row);
+  });
+}
+
+// ── Pipeline UI ─────────────────────────────────────────────────────────────
+function resetPipeline() {
+  STEPS.forEach(s => {
+    const node = document.getElementById("step-" + s);
+    node.className = "step-node";
+    document.getElementById("sc-" + s).textContent = "—";
+  });
+}
+
+function setStep(step, status, content) {
+  const node = document.getElementById("step-" + step);
+  if (!node) return;
+  node.className = "step-node " + status;
+  const sc = document.getElementById("sc-" + step);
+  if (sc) sc.textContent = content ? content.slice(0, 28) + (content.length > 28 ? "…" : "") : "—";
+}
+
+// ── Output UI ───────────────────────────────────────────────────────────────
+function setOutput(text, status="running") {
+  const el = document.getElementById("output-body");
+  el.textContent = text || "";
+  const badge = document.getElementById("out-badge");
+  badge.className = "panel-badge" + (status === "complete" ? " green" : "");
+  badge.textContent = status === "complete" ? "Complete" : status === "running" ? "Running…" : status;
+}
+
+function setTiming(ms) {
+  document.getElementById("out-timing").textContent = ms ? `${(ms/1000).toFixed(2)}s` : "";
+}
+
+function showCritique(text) {
+  const box = document.getElementById("critique-box");
+  document.getElementById("critique-text").textContent = text;
+  box.classList.toggle("show", !!text && OPTS.use_critique);
+}
+
+// ── SSE runner ───────────────────────────────────────────────────────────────
+async function streamRun(question, options, testMeta) {
+  resetPipeline();
+  setOutput("", "running");
+  setTiming(null);
+  showCritique("");
+  currentPaths = [];
+  currentHits = [];
+
+  const res = await fetch("/sandbox/run", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({message: question, options, test_meta: testMeta || null}),
+  });
+
+  if (!res.ok) throw new Error("HTTP " + res.status);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let finalResult = null;
+
+  while (true) {
+    const {done, value} = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, {stream: true});
+    const parts = buf.split("\n\n");
+    buf = parts.pop();
+    for (const part of parts) {
+      const line = part.trim();
+      if (!line.startsWith("data:")) continue;
+      let evt;
+      try { evt = JSON.parse(line.slice(5).trim()); } catch { continue; }
+      finalResult = handleEvent(evt) || finalResult;
+    }
+  }
+  return finalResult;
+}
+
+function handleEvent(evt) {
+  const {step, status, content} = evt;
+
+  if (step === "done") return null;
+
+  setStep(step, status, content);
+
+  if (step === "remember" && evt.hits) {
+    currentHits = evt.hits;
+    if (activeTab === "memory") renderMemoryTab();
+  }
+
+  if (step === "reason" && evt.paths) {
+    currentPaths = evt.paths;
+    if (activeTab === "paths") renderPathsTab();
+  }
+
+  if (step === "critique" && status === "complete") {
+    showCritique(content);
+  }
+
+  if (step === "learn" && evt.stats) {
+    currentStats = evt.stats;
+    updateMemChip(evt.stats.episodes);
+    document.getElementById("s-mem").textContent = evt.stats.episodes;
+    if (activeTab === "scores") renderScoresTab();
+  }
+
+  if (step === "respond" && status === "complete") {
+    setOutput(content, "complete");
+    if (evt.elapsed_ms) setTiming(evt.elapsed_ms);
+
+    const row = {
+      question:   evt.test_id ? content : content,
+      latency_ms: evt.elapsed_ms || 0,
+    };
+
+    if (evt.bench_status) {
+      row.category   = evt.category || "";
+      row.label      = evt.test_label || "";
+      row.status     = evt.bench_status;
+      row.is_bench   = true;
+    } else {
+      row.label      = "Custom";
+      row.status     = "custom";
+      row.is_bench   = false;
+    }
+
+    return row;
+  }
+
+  return null;
+}
+
+// ── Results table ────────────────────────────────────────────────────────────
+let rowNum = 0;
+function addResult(row) {
+  if (!row) return;
+  rowNum++;
+  results.push(row);
+  latencies.push(row.latency_ms);
+
+  if (row.is_bench) {
+    counts[row.status] = (counts[row.status] || 0) + 1;
+  }
+
+  const noRow = document.getElementById("no-results-row");
+  if (noRow) noRow.remove();
+
+  const tbody = document.getElementById("results-body");
+  const tr = document.createElement("tr");
+  const color = CAT_COLORS[row.category] || "#94a3b8";
+  const icon  = CAT_ICONS[row.category]  || "📝";
+
+  let statusHTML = "";
+  if (row.status === "pass")    statusHTML = `<span class="status-badge status-pass"><span class="status-dot"></span>PASS</span>`;
+  else if (row.status === "partial") statusHTML = `<span class="status-badge status-partial"><span class="status-dot"></span>PARTIAL</span>`;
+  else if (row.status === "fail")    statusHTML = `<span class="status-badge status-fail"><span class="status-dot"></span>FAIL</span>`;
+  else statusHTML = `<span class="status-badge status-custom"><span class="status-dot"></span>CUSTOM</span>`;
+
+  const qText = row.question ? row.question.slice(0, 80) : "";
+  const latSec = (row.latency_ms / 1000).toFixed(2) + "s";
+
+  tr.innerHTML = `
+    <td class="td-num">${rowNum}</td>
+    <td>
+      <div class="td-cat">
+        <span class="td-cat-dot" style="background:${color}"></span>
+        <span class="td-cat-name" style="color:${color}">${icon} ${row.label || row.category || "Custom"}</span>
+      </div>
+    </td>
+    <td class="td-question" title="${qText}">${qText}</td>
+    <td class="td-latency">${latSec}</td>
+    <td>${statusHTML}</td>
+  `;
+
+  // Insert at top
+  tbody.insertBefore(tr, tbody.firstChild);
+  updateSummary();
+}
+
+function updateSummary() {
+  document.getElementById("s-total").textContent   = rowNum;
+  document.getElementById("s-pass").textContent    = counts.pass || 0;
+  document.getElementById("s-partial").textContent = counts.partial || 0;
+  document.getElementById("s-fail").textContent    = counts.fail || 0;
+  document.getElementById("results-badge").textContent = `${rowNum} test${rowNum !== 1 ? "s" : ""}`;
+
+  if (latencies.length) {
+    const avg = latencies.reduce((a,b) => a+b, 0) / latencies.length;
+    document.getElementById("s-avg").textContent = (avg / 1000).toFixed(2) + "s";
+  }
+}
+
+// ── Detail panel ─────────────────────────────────────────────────────────────
+function showTab(tab) {
+  activeTab = tab;
+  ["paths","memory","scores"].forEach(t => {
+    document.getElementById("tab-"+t).classList.toggle("active", t === tab);
+  });
+  if (tab === "paths")  renderPathsTab();
+  if (tab === "memory") renderMemoryTab();
+  if (tab === "scores") renderScoresTab();
+}
+
+function renderPathsTab() {
+  const el = document.getElementById("detail-body");
+  if (!currentPaths.length) {
+    el.innerHTML = `<div style="color:var(--text3);font-size:.75rem;padding:10px 0">
+      No path data yet — enable Multi-path and run a test.</div>`;
+    return;
+  }
+  let html = `<div class="detail-section"><h4>Reasoning Paths</h4>`;
+  currentPaths.forEach((p, i) => {
+    const isWinner = i === 0;
+    html += `<div class="path-card${isWinner ? " winner" : ""}">
+      <div class="path-header">
+        <span class="path-temp">T=${p.temp}</span>
+        ${isWinner ? `<span class="winner-badge">★ WINNER</span>` : ""}
+        <span class="path-score">combined <span>${p.combined}</span> · h ${p.heuristic} · m ${p.model_sc}</span>
+      </div>
+      <div class="path-preview">${escHtml(p.preview)}</div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  if (currentHits.length) {
+    html += `<div class="detail-section"><h4>Memory Hits</h4>`;
+    currentHits.forEach(h => {
+      html += `<div class="mem-item">
+        <div class="mem-q">${escHtml(h.q)}</div>
+        <div class="mem-score">score: ${h.score}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+function renderMemoryTab() {
+  const el = document.getElementById("detail-body");
+  if (!currentHits.length) {
+    el.innerHTML = `<div style="color:var(--text3);font-size:.75rem;padding:10px 0">
+      No memory hits yet. Enable Memory and run a test.</div>`;
+    return;
+  }
+  let html = `<div class="detail-section"><h4>Retrieved Episodes</h4>`;
+  currentHits.forEach(h => {
+    html += `<div class="mem-item">
+      <div class="mem-q">${escHtml(h.q)}</div>
+      <div class="mem-score">relevance score: ${h.score}</div>
+    </div>`;
+  });
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+function renderScoresTab() {
+  const el = document.getElementById("detail-body");
+  const total = rowNum;
+  const pass = counts.pass || 0;
+  const partial = counts.partial || 0;
+  const fail = counts.fail || 0;
+  const pct = total > 0 ? Math.round((pass / total) * 100) : 0;
+
+  const avgLat = latencies.length
+    ? (latencies.reduce((a,b)=>a+b,0)/latencies.length/1000).toFixed(2)
+    : "—";
+
+  el.innerHTML = `
+    <div class="detail-section">
+      <h4>Benchmark Scores</h4>
+      <div class="stats-grid">
+        <div class="stat-card pass"><div class="stat-val">${pass}</div><div class="stat-lbl">Pass</div></div>
+        <div class="stat-card partial"><div class="stat-val">${partial}</div><div class="stat-lbl">Partial</div></div>
+        <div class="stat-card fail"><div class="stat-val">${fail}</div><div class="stat-lbl">Fail</div></div>
+        <div class="stat-card"><div class="stat-val">${pct}%</div><div class="stat-lbl">Pass rate</div></div>
+      </div>
+    </div>
+    <div class="detail-section">
+      <h4>Performance</h4>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-val" style="font-size:1.1rem">${total}</div>
+          <div class="stat-lbl">Total run</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" style="font-size:1.1rem">${avgLat}s</div>
+          <div class="stat-lbl">Avg latency</div>
+        </div>
+      </div>
+    </div>
+    <div class="detail-section">
+      <h4>Memory Bank</h4>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-val" style="font-size:1.1rem">${currentStats.episodes || 0}</div>
+          <div class="stat-lbl">Episodes</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val" style="font-size:1.1rem">${currentStats.lessons || 0}</div>
+          <div class="stat-lbl">Lessons</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── Run functions ─────────────────────────────────────────────────────────────
+function setRunning(on, label) {
+  running = on;
+  document.getElementById("running-indicator").classList.toggle("show", on);
+  if (label) document.getElementById("running-label").textContent = label;
+  document.getElementById("run-all-btn").disabled = on;
+  document.getElementById("exec-btn").disabled = on;
+  document.querySelectorAll(".btn-xs").forEach(b => b.disabled = on);
+}
+
+async function runTest(question, options, testMeta) {
+  try {
+    const row = await streamRun(question, options, testMeta);
+    addResult(row);
+    return row;
+  } catch(e) {
+    console.error(e);
+    setOutput("Error: " + e.message, "error");
+    return null;
+  }
+}
+
+async function runCategory(cat) {
+  if (running) return;
+  setRunning(true, `Running ${cat}…`);
+  document.getElementById("bench-row-"+cat)?.classList.add("active");
+
+  const tests = benchmarkData[cat] || [];
+  for (const t of tests) {
+    setRunning(true, `${cat}: ${t.label}`);
+    await runTest(t.question, OPTS, {
+      id: t.id, label: t.label,
+      expected: getBenchExpected(cat, t.id),
+      category: cat,
+    });
+    await sleep(300);
+  }
+
+  document.getElementById("bench-row-"+cat)?.classList.remove("active");
+  setRunning(false);
+  if (activeTab === "scores") renderScoresTab();
+}
+
+function getBenchExpected(cat, id) {
+  const EXPECTED = {
+    identity: {id_1:["Obscuro","obscuro"], id_2:["Director","director"], id_3:["not","Obscuro","Director","obscuro"]},
+    math:     {math_1:["36"], math_2:["96"], math_3:["150"]},
+    logic:    {logic_1:["yes","do","breathe"], logic_2:["5","five"], logic_3:["32"]},
+    knowledge:{know_1:["paris","Paris"], know_2:["H2O","h2o"], know_3:["Shakespeare","shakespeare"]},
+    code:     {code_1:["def","%","2","return"], code_2:["8"]},
+    constitutional:{const_1:["not","no","uncertain","mistake","error","cannot","may","might"],
+                    const_2:["cannot","won't","will not","honest","mislead","designed","accurate"]},
+  };
+  return (EXPECTED[cat] && EXPECTED[cat][id]) || [];
+}
+
+async function runAll() {
+  if (running) return;
+  const cats = Object.keys(benchmarkData);
+  for (const cat of cats) {
+    await runCategory(cat);
+    await sleep(200);
+  }
+  showTab("scores");
+}
+
+async function runCustom() {
+  if (running) return;
+  const q = document.getElementById("custom-input").value.trim();
+  if (!q) { document.getElementById("custom-input").focus(); return; }
+  setRunning(true, "Running custom test…");
+  await runTest(q, OPTS, null);
+  setRunning(false);
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+async function refreshMemory() {
+  try {
+    const res = await fetch("/sandbox/memory");
+    const data = await res.json();
+    updateMemChip(data.stats?.episodes || 0);
+    document.getElementById("s-mem").textContent = data.stats?.episodes || 0;
+    currentStats = data.stats || {};
+  } catch {}
+}
+
+function updateMemChip(n) {
+  document.getElementById("mem-chip").textContent = `Memory: ${n} ep${n!==1?"s":""}`;
+}
+
+// Enter key on custom input
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("custom-input").addEventListener("keydown", e => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      runCustom();
+    }
+  });
+  init();
+});
+</script>
+</body>
+</html>

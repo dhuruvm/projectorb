@@ -1,0 +1,69 @@
+Refactor the existing project into a clean, minimal, high-quality codebase. Remove redundant, obsolete, duplicate, generated, and low-value files. Do not create hundreds of unnecessary files or abstractions. Prefer a small number of well-designed modules with clear responsibilities. Quality, maintainability, and working functionality matter more than code volume.
+
+Core Goal
+
+Build an advanced autonomous AI agent architecture inspired by cognitive systems. The system should behave as an adaptive reasoning agent rather than a collection of hard-coded responses.
+
+The architecture should support:
+
+- Multi-step and multi-path reasoning, allowing the system to generate, compare, score, and revise different approaches before choosing an action.
+- A persistent memory system for storing useful experiences, discoveries, decisions, failures, and lessons.
+- A curiosity mechanism that identifies knowledge gaps, generates questions, explores unfamiliar subjects, and prioritizes useful learning.
+- Metacognitive capabilities that allow the system to inspect its reasoning process, detect uncertainty and mistakes, and revise its approach.
+- Autonomous planning and execution with explicit goals, subgoals, progress tracking, verification, recovery, and stopping conditions.
+- Advanced problem-solving across coding, cybersecurity, defensive security research, philosophy, human behavior, persuasion, and other complex domains.
+- Tool use, including controlled web browsing, code execution, search, retrieval, and other available capabilities.
+- Continuous improvement through experience, evaluation, feedback, memory, and measurable updates to strategies or supporting components.
+- Strong path recovery: when one approach fails, diagnose the failure, generate alternatives, and continue from the best viable path instead of repeatedly attempting the same solution.
+
+Cognitive Architecture
+
+Design the system around a compact cognitive loop:
+
+Observe → Understand → Question → Generate Options → Reason → Evaluate Risk and Uncertainty → Decide → Act → Verify → Learn → Update Memory
+
+Create dedicated components only where they provide clear value. Possible components include:
+
+1. Executive Controller — coordinates goals, reasoning, tools, and actions.
+2. Reasoning Engine — explores multiple candidate solutions and evaluates tradeoffs.
+3. Curiosity Engine — detects uncertainty and knowledge gaps and proposes useful investigations.
+4. Memory System — manages working, episodic, semantic, and procedural memory.
+5. World Model — maintains an evidence-based representation of the environment and current task.
+6. Planner — converts objectives into executable and revisable plans.
+7. Critic and Verifier — tests outputs, checks evidence, finds contradictions, and detects failures.
+8. Learning Loop — extracts reusable lessons from completed tasks and failed attempts.
+9. Tool and Browser Interface — gives the agent controlled access to external information and capabilities.
+
+Do not claim that the system is conscious or genuinely self-aware unless there is scientific evidence for that claim. Instead, implement functional self-modeling: the system should track its goals, capabilities, limitations, uncertainty, available tools, memory, and previous decisions.
+
+Self-Learning and Improvement
+
+Browsing alone is not learning. Build an explicit learning pipeline:
+
+Experience → Evaluation → Lesson Extraction → Memory Consolidation → Strategy Update → Future Testing
+
+The system may propose improvements to its own prompts, strategies, workflows, and code, but changes must be testable, versioned, reversible, and validated before adoption. Do not allow uncontrolled recursive self-modification.
+
+Security Research
+
+Support legitimate cybersecurity learning, defensive analysis, vulnerability research in authorized environments, secure coding, and controlled sandbox experimentation. Security capabilities should be implemented as technical competencies rather than as mechanisms for bypassing safeguards or enabling unauthorized exploitation.
+
+Engineering Requirements
+
+Start by auditing the existing repository. Identify what is valuable, what is broken, what is duplicated, and what should be removed. Preserve working functionality wherever possible.
+
+Then:
+
+- Simplify the architecture before adding new components.
+- Reuse strong existing code instead of rewriting everything.
+- Keep the dependency count low.
+- Use clear interfaces between components.
+- Avoid placeholder implementations presented as completed features.
+- Add tests for critical reasoning, memory, planning, recovery, and tool-use behavior.
+- Measure improvement with benchmarks rather than subjective claims.
+- Keep logs and decisions inspectable for debugging.
+- Make autonomous actions bounded, observable, interruptible, and reversible where possible.
+
+Before writing significant amounts of code, produce a concise architecture assessment and implementation plan. Then implement the smallest functional version of the cognitive loop end-to-end. Test it on realistic tasks, identify weaknesses, and improve it iteratively.
+
+The final result should be a compact, coherent autonomous-agent system with strong reasoning, curiosity, memory, planning, learning, verification, and recovery capabilities—not a large collection of disconnected files marketed as intelligence.
