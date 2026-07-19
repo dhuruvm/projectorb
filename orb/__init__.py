@@ -1,15 +1,22 @@
 """
-Obscuro — OASIS Cognitive Agent
-Created by The Director · Orthogonal Autonomous Self-Improving System
+Obscuro — Unified Autonomous Intelligence.
+Created by The Director.
 
-Package layout:
-  model     — GPT-2 wrapper: loading, generation, scoring
-  memory    — SQLite-backed episodic + semantic memory
-  reasoning — Multi-path generation with candidate ranking
-  critic    — Constitutional self-critique and revision
-  curiosity — Knowledge gap detection and clarification
-  agent     — Executive controller: cognitive loop
+Public API:
+  OrbAgent      — unified cognitive system (model + loop + tools + memory)
+  AgentOptions  — per-call configuration
+  AgentResponse — structured result with loop steps, tool trace, memory hits
 """
-from .agent import OrbAgent, AgentOptions, AgentResponse
+from .agent   import OrbAgent, AgentOptions, AgentResponse
+from .model   import OrbModel
+from .memory  import Memory, Episode
+from .tools   import ToolRegistry, ToolResult
+from .loop    import CognitiveLoop, LoopResult, LoopStep
 
-__all__ = ["OrbAgent", "AgentOptions", "AgentResponse"]
+__all__ = [
+    "OrbAgent", "AgentOptions", "AgentResponse",
+    "OrbModel",
+    "Memory", "Episode",
+    "ToolRegistry", "ToolResult",
+    "CognitiveLoop", "LoopResult", "LoopStep",
+]

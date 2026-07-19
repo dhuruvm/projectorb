@@ -1,8 +1,8 @@
 """
-Obscuro — OASIS Cognitive Agent · Gradio 6 interface
+Obscuro — Unified Autonomous Intelligence · Gradio 6 interface
 Created by The Director.
 
-Thin UI layer wrapping OrbAgent. All reasoning logic lives in orb/.
+Thin UI layer over OrbAgent. All cognitive logic lives in orb/.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from fastapi import FastAPI
 
 from orb.agent import OrbAgent, AgentOptions
 
-# ── Agent singleton (shared across all sessions) ──────────────────────────────
+# ── Agent singleton ───────────────────────────────────────────────────────────
 
 agent = OrbAgent()
 
@@ -34,6 +34,39 @@ def _get_text(content) -> str:
         return " ".join(p for p in parts if p).strip()
     return str(content)
 
+
+def _format_tool_trace(result) -> str:
+    """Format ReAct loop steps into a readable trace string."""
+    if not result.loop_steps and not result.used_tools:
+        return ""
+
+    lines = []
+    lines.append(
+        f"ReAct loop · {result.iterations} iteration(s) · "
+        f"{len(result.used_tools)} tool call(s) · {result.elapsed_ms} ms"
+    )
+
+    for step in result.loop_steps:
+        if step.action and step.tool_result:
+            tr    = step.tool_result
+            status = "✓" if tr.success else "✗"
+            lines.append(
+                f"[{step.iteration + 1}] {status} {tr.tool}  ({tr.elapsed_ms}ms)"
+            )
+            preview = tr.output[:200].replace("\n", " ")
+            if preview:
+                lines.append(f"    ↳ {preview}" + ("…" if len(tr.output) > 200 else ""))
+        elif step.thought:
+            preview = step.thought[:120].replace("\n", " ")
+            lines.append(f"[{step.iteration + 1}] Thought: {preview}…")
+
+    if result.used_tools:
+        unique = list(dict.fromkeys(result.used_tools))  # preserve order, dedupe
+        lines.append("Tools: " + " · ".join(unique))
+
+    return "\n".join(lines)
+
+
 # ── Chat handlers ─────────────────────────────────────────────────────────────
 
 def user_turn(message: str, history: list):
@@ -45,14 +78,14 @@ def user_turn(message: str, history: list):
 def bot_turn(
     history: list,
     max_new_tokens, temperature, top_p, top_k, rep_penalty, seed,
-    four_stream, use_critique, multi_path,
+    four_stream, use_critique, multi_path, use_tools,
 ):
     if not history:
-        return history, "", "", ""
+        return history, "", "", "", ""
 
     last = history[-1]
     if not isinstance(last, dict) or last.get("role") != "user":
-        return history, "", "", ""
+        return history, "", "", "", ""
 
     message = _get_text(last.get("content", ""))
     past    = history[:-1]
@@ -68,14 +101,19 @@ def bot_turn(
             four_stream=bool(four_stream),
             use_critique=bool(use_critique),
             multi_path=bool(multi_path),
+            use_tools=bool(use_tools),
         )
         result = agent.run(message, past, opts)
 
+        # Status line
         stats      = agent.memory_stats()
+        mode_label = "ReAct+Tools" if opts.use_tools else "MultiPath"
         status_str = (
-            f"Memory — episodes: {stats['episodes']} | lessons: {stats['lessons']} | "
+            f"Mode: {mode_label} · episodes: {stats['episodes']} · "
             f"time: {result.elapsed_ms} ms"
         )
+
+        # Reasoning path scores (multi-path mode)
         paths_str = ""
         if result.reasoning_paths:
             paths_str = "  ".join(
@@ -83,11 +121,15 @@ def bot_turn(
                 for p in result.reasoning_paths
             )
 
+        # Tool trace (ReAct mode)
+        trace_str = _format_tool_trace(result)
+
         return (
             history + [{"role": "assistant", "content": result.response}],
             result.critique,
             status_str,
             paths_str,
+            trace_str,
         )
 
     except gr.Error:
@@ -95,6 +137,7 @@ def bot_turn(
     except Exception as exc:
         print(f"[bot_turn error]\n{traceback.format_exc()}")
         raise gr.Error(f"Generation failed: {exc}") from exc
+
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
@@ -171,6 +214,11 @@ body, .gradio-container { background: #080b14 !important; }
     color: #a78bfa !important; font-size: 0.75rem !important;
     border-radius: 8px !important; font-family: monospace;
 }
+#trace-box textarea {
+    background: #0a1010 !important; border: 1px solid #1a3a2a !important;
+    color: #67e8f9 !important; font-size: 0.75rem !important;
+    border-radius: 8px !important; font-family: monospace;
+}
 
 .sh { color: #334155; font-size: 0.72rem; text-transform: uppercase;
       letter-spacing: 0.09em; font-weight: 600; margin-bottom: 8px; }
@@ -194,20 +242,21 @@ body, .gradio-container { background: #080b14 !important; }
 .pill span { color: #7ec8e3; }
 .pill.green span { color: #4ade80; }
 .pill.purple span { color: #a78bfa; }
+.pill.cyan span { color: #67e8f9; }
 """
 
 # ── UI ────────────────────────────────────────────────────────────────────────
 
 model_badge = agent.model_label.split("(")[0].strip()
 
-with gr.Blocks(title="Obscuro — OASIS Cognitive Agent") as demo:
+with gr.Blocks(title="Obscuro — Unified Autonomous Intelligence", css=CSS) as demo:
 
     gr.HTML(f"""
     <div id="page-header">
       <div class="logo">🔮</div>
       <div class="titles">
-        <h1>Obscuro · OASIS Cognitive Agent</h1>
-        <p>Created by The Director · Multi-path Reasoning · Constitutional Critique · Persistent Memory</p>
+        <h1>Obscuro · Unified Autonomous Intelligence</h1>
+        <p>Created by The Director · ReAct Cognitive Loop · Tool Use · TF-IDF Memory · Constitutional Critique</p>
       </div>
       <div class="badge">{model_badge} · 1.24B params</div>
     </div>
@@ -226,14 +275,14 @@ with gr.Blocks(title="Obscuro — OASIS Cognitive Agent") as demo:
                     "<div style='font-size:3rem;margin-bottom:12px'>🔮</div>"
                     "<div style='font-size:1.1rem;font-weight:600;color:#2d4a7a'>Obscuro is ready</div>"
                     "<div style='font-size:0.85rem;margin-top:6px;color:#1e3a5f'>"
-                    "Created by The Director · Cognitive loop active</div>"
+                    "Unified autonomous intelligence · ReAct loop active · Tools enabled</div>"
                     "</div>"
                 ),
             )
 
             with gr.Row(variant="panel"):
                 msg = gr.Textbox(
-                    placeholder="Ask Obscuro anything…",
+                    placeholder="Ask Obscuro anything, or give it a task to execute…",
                     show_label=False, lines=2, max_lines=6,
                     elem_id="msg-box", scale=5, container=False,
                 )
@@ -243,18 +292,23 @@ with gr.Blocks(title="Obscuro — OASIS Cognitive Agent") as demo:
 
             gr.HTML('<div class="sh" style="padding-top:8px">Quick prompts</div>')
             with gr.Row():
-                chip1 = gr.Button("Why does ice float on water?",    elem_classes=["chip-btn"], size="sm")
-                chip2 = gr.Button("Explain machine learning simply",  elem_classes=["chip-btn"], size="sm")
-                chip3 = gr.Button("What causes inflation?",           elem_classes=["chip-btn"], size="sm")
-                chip4 = gr.Button("Are you conscious?",               elem_classes=["chip-btn"], size="sm")
+                chip1 = gr.Button("List files in this workspace",          elem_classes=["chip-btn"], size="sm")
+                chip2 = gr.Button("Write a Python fizzbuzz and run it",    elem_classes=["chip-btn"], size="sm")
+                chip3 = gr.Button("What is a SQL injection attack?",       elem_classes=["chip-btn"], size="sm")
+                chip4 = gr.Button("Are you conscious?",                    elem_classes=["chip-btn"], size="sm")
 
+            trace_box = gr.Textbox(
+                label="⚡ ReAct Tool Trace",
+                elem_id="trace-box", lines=4, interactive=False, visible=False,
+                placeholder="Tool execution trace appears here when Autonomous Mode is enabled…",
+            )
             critique_box = gr.Textbox(
                 label="🔍 Constitutional Self-Critique",
                 elem_id="critique-box", lines=3, interactive=False, visible=False,
                 placeholder="Critique appears here when Constitutional Mode is enabled…",
             )
             status_box = gr.Textbox(
-                label="⚙ Memory & Timing",
+                label="⚙ Status",
                 elem_id="status-box", lines=1, interactive=False, visible=False,
             )
             paths_box = gr.Textbox(
@@ -264,22 +318,24 @@ with gr.Blocks(title="Obscuro — OASIS Cognitive Agent") as demo:
 
         # ── Settings sidebar ─────────────────────────────────────────────────
         with gr.Column(scale=1, elem_id="settings-panel"):
-            gr.HTML('<div class="sh" style="margin-bottom:12px">🔮 OASIS Settings</div>')
+            gr.HTML('<div class="sh" style="margin-bottom:12px">🔮 Cognitive Mode</div>')
 
+            use_tools    = gr.Checkbox(value=True,  label="⚡ Autonomous Mode  (ReAct + Tools)")
             multi_path   = gr.Checkbox(value=True,  label="🧠 Multi-Path Reasoning  (3 candidates)")
-            four_stream  = gr.Checkbox(value=False,  label="⊞ Four-Stream Reasoning")
+            four_stream  = gr.Checkbox(value=False, label="⊞ Four-Stream Reasoning")
             use_critique = gr.Checkbox(value=False, label="⚖ Constitutional Self-Critique")
 
             gr.HTML('<div class="sh" style="margin-top:12px">Inspect</div>')
+            show_trace    = gr.Checkbox(value=True,  label="Show ReAct tool trace")
             show_critique = gr.Checkbox(value=False, label="Show critique panel")
-            show_status   = gr.Checkbox(value=False, label="Show memory & timing")
+            show_status   = gr.Checkbox(value=False, label="Show status & timing")
             show_paths    = gr.Checkbox(value=False, label="Show reasoning path scores")
 
             gr.HTML('<hr style="border-color:#1a2844;margin:12px 0">')
             gr.HTML('<div class="sh">⚙ Generation settings</div>')
 
-            max_new_tokens = gr.Slider(20,  400, value=200, step=10,   label="Max new tokens")
-            temperature    = gr.Slider(0.1, 2.0, value=0.85, step=0.05, label="Temperature")
+            max_new_tokens = gr.Slider(20,  600, value=400, step=20,   label="Max new tokens")
+            temperature    = gr.Slider(0.1, 2.0, value=0.7,  step=0.05, label="Temperature")
             top_p          = gr.Slider(0.1, 1.0, value=0.95, step=0.01, label="Top-p")
             top_k          = gr.Slider(0,   100, value=50,   step=1,    label="Top-k")
             rep_penalty    = gr.Slider(1.0, 2.0, value=1.1,  step=0.05, label="Repetition penalty")
@@ -287,13 +343,14 @@ with gr.Blocks(title="Obscuro — OASIS Cognitive Agent") as demo:
 
             gr.HTML(f"""
             <div style="margin-top:16px;border-top:1px solid #1a2844;padding-top:14px">
-              <div class="sh">Model info</div>
+              <div class="sh">Architecture</div>
               <div style="display:flex;flex-wrap:wrap;gap:5px">
                 <span class="pill purple">model <span>Obscuro</span></span>
                 <span class="pill">by <span>The Director</span></span>
-                <span class="pill">params <span>117 M</span></span>
-                <span class="pill">ctx <span>1024 tok</span></span>
-                <span class="pill green">checkpoint <span>{model_badge}</span></span>
+                <span class="pill green">loop <span>ReAct</span></span>
+                <span class="pill cyan">tools <span>8 built-in</span></span>
+                <span class="pill">memory <span>TF-IDF</span></span>
+                <span class="pill green">ckpt <span>{model_badge}</span></span>
               </div>
             </div>
             """)
@@ -302,8 +359,9 @@ with gr.Blocks(title="Obscuro — OASIS Cognitive Agent") as demo:
     <div style="border-top:1px solid #1a2844;padding:10px 0 2px;
                 display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
       <span class="pill purple">Obscuro <span>by The Director</span></span>
-      <span class="pill">framework <span>OASIS · HuggingFace</span></span>
-      <span class="pill">architecture <span>multi-path + critique + memory</span></span>
+      <span class="pill">framework <span>OASIS · ReAct · HuggingFace</span></span>
+      <span class="pill cyan">tools <span>shell · python · fs · web</span></span>
+      <span class="pill">memory <span>TF-IDF cosine similarity</span></span>
     </div>
     """)
 
@@ -311,53 +369,51 @@ with gr.Blocks(title="Obscuro — OASIS Cognitive Agent") as demo:
 
     settings = [
         max_new_tokens, temperature, top_p, top_k, rep_penalty, seed,
-        four_stream, use_critique, multi_path,
+        four_stream, use_critique, multi_path, use_tools,
     ]
+    outputs = [chatbot, critique_box, status_box, paths_box, trace_box]
 
     send_btn.click(
         fn=user_turn, inputs=[msg, chatbot], outputs=[msg, chatbot], queue=False,
     ).then(
-        fn=bot_turn, inputs=[chatbot] + settings,
-        outputs=[chatbot, critique_box, status_box, paths_box],
+        fn=bot_turn, inputs=[chatbot] + settings, outputs=outputs,
     )
 
     msg.submit(
         fn=user_turn, inputs=[msg, chatbot], outputs=[msg, chatbot], queue=False,
     ).then(
-        fn=bot_turn, inputs=[chatbot] + settings,
-        outputs=[chatbot, critique_box, status_box, paths_box],
+        fn=bot_turn, inputs=[chatbot] + settings, outputs=outputs,
     )
 
     clear_btn.click(
-        fn=lambda: ([], "", "", ""),
-        outputs=[chatbot, critique_box, status_box, paths_box],
+        fn=lambda: ([], "", "", "", ""),
+        outputs=outputs,
         queue=False,
     )
 
     # Panel visibility toggles
+    show_trace.change(   fn=lambda v: gr.update(visible=v), inputs=show_trace,    outputs=trace_box)
     show_critique.change(fn=lambda v: gr.update(visible=v), inputs=show_critique, outputs=critique_box)
     show_status.change(  fn=lambda v: gr.update(visible=v), inputs=show_status,   outputs=status_box)
     show_paths.change(   fn=lambda v: gr.update(visible=v), inputs=show_paths,    outputs=paths_box)
 
     # Chip buttons
     for chip, text in [
-        (chip1, "Why does ice float on water?"),
-        (chip2, "Explain machine learning simply"),
-        (chip3, "What causes inflation?"),
+        (chip1, "List files in this workspace"),
+        (chip2, "Write a Python fizzbuzz and run it"),
+        (chip3, "What is a SQL injection attack?"),
         (chip4, "Are you conscious?"),
     ]:
         chip.click(fn=lambda t=text: t, outputs=msg, queue=False)
 
-# ── Build FastAPI host app, mount sandbox + Gradio into it ───────────────────
-# Gradio 6: create a FastAPI app first, register custom routes, then mount
-# the Gradio demo via gr.mount_gradio_app so everything runs on one port.
 
-fapp = FastAPI(title="Obscuro")
+# ── Build FastAPI host app ────────────────────────────────────────────────────
+
+fapp = FastAPI(title="Obscuro — Unified Autonomous Intelligence")
 
 from sandbox.server import register_sandbox
 register_sandbox(fapp, agent, model_badge)
 
-# Gradio serves at root; the sandbox is at /sandbox (already registered above)
 app = gr.mount_gradio_app(fapp, demo, path="/", app_kwargs={"root_path": ""})
 
 # ── Launch ────────────────────────────────────────────────────────────────────
