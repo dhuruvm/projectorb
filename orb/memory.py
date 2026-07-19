@@ -7,8 +7,15 @@ Three stores:
   facts    — discrete factual claims
 
 Retrieval uses TF-IDF cosine similarity — genuine semantic relevance without
-requiring an embedding model or vector database. Significantly better than
-the previous keyword-overlap approach: "fast" and "quick" now score similarly.
+requiring an embedding model or vector database.
+
+v2 additions
+────────────
+  answer property      Episode.answer is an alias for Episode.response
+                       (for compatibility with subconscious + external code)
+  retrieve_associative chained retrieval: query → top episode → re-query,
+                       surfacing second-order relevant memories
+  recency weighting    optional recency bonus in retrieve_similar
 """
 from __future__ import annotations
 
@@ -63,25 +70,19 @@ _STOPWORDS = {
 
 
 def _tokenize(text: str) -> list[str]:
-    """Lowercase word tokens, length ≥ 2, stopwords removed."""
     words = re.findall(r"\b[a-z]{2,}\b", text.lower())
     return [w for w in words if w not in _STOPWORDS]
 
 
 def _tfidf_vector(tokens: list[str], idf: dict[str, float]) -> dict[str, float]:
-    """Compute a TF-IDF vector for a token list given a pre-computed IDF table."""
     if not tokens:
         return {}
     tf    = Counter(tokens)
     total = len(tokens)
-    return {
-        w: (count / total) * idf.get(w, 1.0)
-        for w, count in tf.items()
-    }
+    return {w: (count / total) * idf.get(w, 1.0) for w, count in tf.items()}
 
 
 def _cosine(a: dict[str, float], b: dict[str, float]) -> float:
-    """Cosine similarity between two sparse TF-IDF vectors."""
     if not a or not b:
         return 0.0
     common = set(a) & set(b)
@@ -104,6 +105,11 @@ class Episode:
     lesson:   str
     score:    float
     ts:       float
+
+    @property
+    def answer(self) -> str:
+        """Alias for response — keeps subconscious + external code clean."""
+        return self.response
 
     def summary(self) -> str:
         q = self.question[:70].rstrip()
@@ -133,10 +139,9 @@ class Memory:
         with self._conn() as c:
             c.executescript(_SCHEMA)
 
-    # ── IDF ──────────────────────────────────────────────────────────────────
+    # ── IDF ───────────────────────────────────────────────────────────────────
 
     def _compute_idf(self, corpus: list[str]) -> dict[str, float]:
-        """Compute smoothed IDF over a corpus of document strings."""
         N = len(corpus)
         if N == 0:
             return {}
@@ -149,7 +154,7 @@ class Memory:
             for w, count in df.items()
         }
 
-    # ── Episodes ─────────────────────────────────────────────────────────────
+    # ── Episodes ──────────────────────────────────────────────────────────────
 
     def add_episode(
         self,
@@ -167,10 +172,15 @@ class Memory:
             )
             return cur.lastrowid
 
-    def retrieve_similar(self, query: str, k: int = 3) -> list[Episode]:
+    def retrieve_similar(
+        self,
+        query:          str,
+        k:              int   = 3,
+        recency_weight: float = 0.15,    # 0 = pure semantic, 1 = pure recency
+    ) -> list[Episode]:
         """
-        Return up to k episodes most relevant to `query` using TF-IDF cosine
-        similarity over the 500 most-recent episodes.
+        Return up to k episodes most relevant to `query`.
+        Blends TF-IDF cosine similarity with a mild recency bonus.
         """
         with self._conn() as c:
             rows = c.execute(
@@ -180,27 +190,56 @@ class Memory:
         if not rows:
             return []
 
-        # Build corpus for IDF
         corpus = [r["question"] + " " + r["response"] for r in rows]
         idf    = self._compute_idf(corpus)
 
-        # Query vector
         q_tokens = _tokenize(query)
         if not q_tokens:
             return self.get_recent(k)
         q_vec = _tfidf_vector(q_tokens, idf)
 
-        # Score each episode
+        now     = time.time()
+        max_age = max((now - r["ts"]) for r in rows) or 1.0
+
         scored: list[tuple[float, Episode]] = []
         for row, doc in zip(rows, corpus):
             d_tokens = _tokenize(doc)
             d_vec    = _tfidf_vector(d_tokens, idf)
-            s        = _cosine(q_vec, d_vec)
-            if s > 0.0:
-                scored.append((s, Episode(**dict(row))))
+            sem      = _cosine(q_vec, d_vec)
+            if sem > 0.0:
+                age      = (now - row["ts"]) / max_age        # 0 = newest, 1 = oldest
+                recency  = 1.0 - age                          # 1 = newest, 0 = oldest
+                combined = (1 - recency_weight) * sem + recency_weight * recency
+                scored.append((combined, Episode(**dict(row))))
 
         scored.sort(key=lambda x: -x[0])
         return [ep for _, ep in scored[:k]]
+
+    def retrieve_associative(self, query: str, k: int = 3) -> list[Episode]:
+        """
+        Two-hop associative retrieval.
+        1. Find the single most relevant episode to the query.
+        2. Use that episode's question as a second query.
+        3. Merge the two result sets, deduplicate, return top-k.
+
+        Surfaces second-order related memories that direct search might miss.
+        """
+        first_hop = self.retrieve_similar(query, k=max(k, 2))
+        if not first_hop:
+            return []
+
+        # Second hop: re-query from the top episode's question
+        pivot      = first_hop[0].question
+        second_hop = self.retrieve_similar(pivot, k=k)
+
+        # Merge + deduplicate by episode id
+        seen: set[int]   = set()
+        merged: list[Episode] = []
+        for ep in first_hop + second_hop:
+            if ep.id not in seen:
+                seen.add(ep.id)
+                merged.append(ep)
+        return merged[:k]
 
     def get_recent(self, k: int = 3) -> list[Episode]:
         with self._conn() as c:
@@ -209,7 +248,7 @@ class Memory:
             ).fetchall()
         return [Episode(**dict(row)) for row in rows]
 
-    # ── Lessons ──────────────────────────────────────────────────────────────
+    # ── Lessons ───────────────────────────────────────────────────────────────
 
     def add_lesson(self, lesson: str, domain: str = "") -> None:
         with self._conn() as c:
@@ -225,7 +264,7 @@ class Memory:
             ).fetchall()
         return [r["lesson"] for r in rows]
 
-    # ── Facts ─────────────────────────────────────────────────────────────────
+    # ── Facts ──────────────────────────────────────────────────────────────────
 
     def add_fact(self, fact: str, source: str = "") -> None:
         with self._conn() as c:
@@ -241,7 +280,7 @@ class Memory:
             ).fetchall()
         return [r["fact"] for r in rows]
 
-    # ── Stats ─────────────────────────────────────────────────────────────────
+    # ── Stats ──────────────────────────────────────────────────────────────────
 
     def count(self) -> dict[str, int]:
         with self._conn() as c:
